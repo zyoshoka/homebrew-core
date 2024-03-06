@@ -1,11 +1,10 @@
 class Llvm < Formula
   desc "Next-gen compiler infrastructure"
   homepage "https://llvm.org/"
-  url "https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz"
-  sha256 "58a8818c60e6627064f312dbf46c02d9949956558340938b71cf731ad8bc0813"
+  url "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.1/llvm-project-18.1.1.src.tar.xz"
+  sha256 "8f34c6206be84b186b4b31f47e1b52758fa38348565953fad453d177ef34c0ad"
   # The LLVM Project is under the Apache License v2.0 with LLVM Exceptions
   license "Apache-2.0" => { with: "LLVM-exception" }
-  revision 1
   head "https://github.com/llvm/llvm-project.git", branch: "main"
 
   livecheck do
@@ -49,14 +48,6 @@ class Llvm < Formula
 
   # Fails at building LLDB
   fails_with gcc: "5"
-
-  # Fix arm64 misoptimisation in some cases.
-  # https://github.com/Homebrew/homebrew-core/issues/158957
-  # Remove with LLVM 18.
-  patch do
-    url "https://raw.githubusercontent.com/Homebrew/formula-patches/23704400c86976aaa4f421f56928484a270ac79c/llvm/17.x-arm64-opt.patch"
-    sha256 "0e312207fd9474bd26f4a283ee23d94b334d3ec8732086d30bce95f7c8dc2201"
-  end
 
   def python3
     "python3.12"
@@ -145,12 +136,15 @@ class Llvm < Formula
         args << "-DFFI_LIBRARY_DIR=#{macos_sdk}/usr/lib"
       end
 
+      libcxx_install_libdir = lib/"c++"
+      libcxx_rpaths = [loader_path, rpath(source: libcxx_install_libdir)]
+
       args << "-DLLVM_BUILD_LLVM_C_DYLIB=ON"
       args << "-DLLVM_ENABLE_LIBCXX=ON"
-      args << "-DLIBCXX_INSTALL_LIBRARY_DIR=#{lib}/c++"
-      args << "-DLIBCXXABI_INSTALL_LIBRARY_DIR=#{lib}/c++"
+      args << "-DLIBCXX_INSTALL_LIBRARY_DIR=#{libcxx_install_libdir}"
+      args << "-DLIBCXXABI_INSTALL_LIBRARY_DIR=#{libcxx_install_libdir}"
       args << "-DDEFAULT_SYSROOT=#{macos_sdk}" if macos_sdk
-      runtimes_cmake_args << "-DCMAKE_INSTALL_RPATH=#{loader_path}"
+      runtimes_cmake_args << "-DCMAKE_INSTALL_RPATH=#{libcxx_rpaths.join("|")}"
 
       # Disable builds for OSes not supported by the CLT SDK.
       clt_sdk_support_flags = %w[I WATCH TV].map { |os| "-DCOMPILER_RT_ENABLE_#{os}OS=OFF" }
