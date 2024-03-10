@@ -565,9 +565,6 @@
       "pyqtnetworkauth", "pyqtpurchasing", "pyqtwebengine"
     ]
   },
-  "pyqt-builder": {
-    "exclude_packages": ["packaging", "pyparsing", "sip", "toml"]
-  },
   "python@3.8": {
     "package_name": "",
     "extra_packages": ["setuptools", "pip", "wheel"]
