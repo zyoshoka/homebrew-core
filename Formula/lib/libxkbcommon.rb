@@ -1,8 +1,8 @@
 class Libxkbcommon < Formula
   desc "Keyboard handling library"
   homepage "https://xkbcommon.org/"
-  url "https://xkbcommon.org/download/libxkbcommon-1.5.0.tar.xz"
-  sha256 "560f11c4bbbca10f495f3ef7d3a6aa4ca62b4f8fb0b52e7d459d18a26e46e017"
+  url "https://xkbcommon.org/download/libxkbcommon-1.6.0.tar.xz"
+  sha256 "0edc14eccdd391514458bc5f5a4b99863ed2d651e4dd761a90abf4f46ef99c2b"
   license "MIT"
   head "https://github.com/xkbcommon/libxkbcommon.git", branch: "master"
 
@@ -33,9 +33,13 @@ class Libxkbcommon < Formula
 
   uses_from_macos "libxml2"
 
+  # upstream patch PR, https://github.com/xkbcommon/libxkbcommon/pull/468
+  patch :DATA
+
   def install
     args = %W[
       -Denable-wayland=false
+      -Denable-x11=true
       -Denable-docs=false
       -Dxkb-config-root=#{HOMEBREW_PREFIX}/share/X11/xkb
       -Dx-locale-root=#{HOMEBREW_PREFIX}/share/X11/locale
@@ -60,3 +64,113 @@ class Libxkbcommon < Formula
     system "./test"
   end
 end
+
+__END__
+diff --git a/src/utils.h b/src/utils.h
+index aa7969c..5d79288 100644
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -64,6 +64,8 @@
+
+ #define STRINGIFY(x) #x
+ #define STRINGIFY2(x) STRINGIFY(x)
++#define CONCAT(x,y) x ## y
++#define CONCAT2(x,y) CONCAT(x,y)
+
+ /* Check if a character is valid in a string literal */
+ static inline bool
+diff --git a/test/xvfb-wrapper.c b/test/xvfb-wrapper.c
+index 38d159b..42f3822 100644
+--- a/test/xvfb-wrapper.c
++++ b/test/xvfb-wrapper.c
+@@ -133,25 +133,25 @@ err_display_fd:
+     return ret;
+ }
+
+-/* All X11_TEST functions are in the test_functions_section ELF section.
++/* All X11_TEST functions are in the test_func_sec ELF section.
+  * __start and __stop point to the start and end of that section. See the
+  * __attribute__(section) documentation.
+  */
+-extern const struct test_function __start_test_functions_section, __stop_test_functions_section;
++DECLARE_CUSTOM_ELF_SECTION_POINTERS(CUSTOM_ELF_SECTION);
+
+ int
+ x11_tests_run()
+ {
+     size_t count = 1; /* For NULL-terminated entry */
+
+-    for (const struct test_function *t = &__start_test_functions_section;
+-         t < &__stop_test_functions_section;
++    for (const struct test_function *t = &__start_test_func_sec;
++         t < &__stop_test_func_sec;
+          t++)
+         count++;
+
+     int rc;
+-    for (const struct test_function *t = &__start_test_functions_section;
+-         t < &__stop_test_functions_section;
++    for (const struct test_function *t = &__start_test_func_sec;
++         t < &__stop_test_func_sec;
+          t++) {
+         fprintf(stderr, "Running test: %s from %s\n", t->name, t->file);
+         rc = xvfb_wrapper(t->func);
+diff --git a/test/xvfb-wrapper.h b/test/xvfb-wrapper.h
+index 222fa3e..e818c6b 100644
+--- a/test/xvfb-wrapper.h
++++ b/test/xvfb-wrapper.h
+@@ -15,6 +15,10 @@
+
+ #pragma once
+
++int xvfb_wrapper(int (*f)(char* display));
++
++int x11_tests_run(void);
++
+ typedef int (* x11_test_func_t)(char* display);
+
+ struct test_function {
+@@ -28,17 +32,37 @@ struct test_function {
+  * loop over in x11_tests_run() to extract the tests. This removes the
+  * need of manually adding the tests to a suite or listing them somewhere.
+  */
++#define CUSTOM_ELF_SECTION test_func_sec
++
++#if defined(__APPLE__) && defined(__MACH__)
++#define SET_CUSTOM_ELF_SECTION(_section) \
++    __attribute__((retain,used)) \
++    __attribute__((section("__DATA," STRINGIFY(_section))))
++
++/* Custom section pointers. See: https://stackoverflow.com/a/22366882 */
++#define DECLARE_CUSTOM_ELF_SECTION_POINTERS(_section) \
++extern const struct test_function CONCAT2(__start_, _section) \
++    __asm("section$start$__DATA$" STRINGIFY2(_section)); \
++extern const struct test_function CONCAT2(__stop_, _section) \
++    __asm("section$end$__DATA$" STRINGIFY2(_section))
++
++#else
++
++#define SET_CUSTOM_ELF_SECTION(_section) \
++    __attribute__((retain,used)) \
++    __attribute__((section(STRINGIFY(_section))))
++
++#define DECLARE_CUSTOM_ELF_SECTION_POINTERS(_section) \
++    extern const struct test_function \
++    CONCAT2(__start_, _section), CONCAT2(__stop_, _section)
++#endif
++
+ #define X11_TEST(_func) \
+ static int _func(char* display); \
+ static const struct test_function _test_##_func \
+-__attribute__((used)) \
+-__attribute__((section("test_functions_section"))) = { \
++SET_CUSTOM_ELF_SECTION(CUSTOM_ELF_SECTION) = { \
+     .name = #_func, \
+     .func = _func, \
+     .file = __FILE__, \
+ }; \
+ static int _func(char* display)
+-
+-int xvfb_wrapper(int (*f)(char* display));
+-
+-int x11_tests_run(void);
