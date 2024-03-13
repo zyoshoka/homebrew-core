@@ -52,10 +52,19 @@ class Sundials < Formula
 
   test do
     cp Dir[pkgshare/"examples/*"], testpath
-    system ENV.cc, "test_nvector.c", "test_nvector_serial.c", "-o", "test",
-                   "-I#{include}", "-L#{lib}",
-                   "-lsundials_core", "-lsundials_nvecserial", "-lmpi", "-lm"
-    assert_match "SUCCESS: NVector module passed all tests",
-                 shell_output("./test 42 0")
+    args = %W[
+      -I#{include}
+      -L#{lib}
+      -lsundials_core
+      -lsundials_nvecserial
+      -lmpi
+      -lm
+    ]
+
+    args += ["-I#{Formula["open-mpi"].opt_include}", "-L#{Formula["open-mpi"].opt_lib}"] if OS.mac?
+    
+    system ENV.cc, "test_nvector.c", "test_nvector_serial.c", "-o", "test", *args
+                   
+    assert_match "SUCCESS: NVector module passed all tests", shell_output("./test 42 0")
   end
 end
