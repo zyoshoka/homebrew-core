@@ -434,10 +434,6 @@
   "mentat": {
     "exclude_packages": ["certifi", "numpy", "pillow"]
   },
-  "meson-python": {
-    "exclude_packages": ["meson", "packaging"],
-    "extra_packages": ["tomli"]
-  },
   "meta-package-manager": {
     "exclude_packages": ["certifi"]
   },
