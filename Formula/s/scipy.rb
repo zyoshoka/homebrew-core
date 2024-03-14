@@ -16,19 +16,18 @@ class Scipy < Formula
     sha256 cellar: :any_skip_relocation, x86_64_linux:   "44149ad76d523bb1fcb3c8c437671c81575d08fa177da1aa351d6d1e68739c60"
   end
 
-  depends_on "libcython" => :build
   depends_on "meson" => :build
-  depends_on "meson-python" => :build
   depends_on "ninja" => :build
   depends_on "pkg-config" => :build
-  depends_on "python@3.11" => [:build, :test]
   depends_on "python@3.12" => [:build, :test]
-  depends_on "pythran" => :build
   depends_on "gcc" # for gfortran
   depends_on "numpy"
   depends_on "openblas"
-  depends_on "pybind11"
   depends_on "xsimd"
+
+  on_linux do
+    depends_on "patchelf" => :build
+  end
 
   cxxstdlib_check :skip
 
@@ -39,14 +38,9 @@ class Scipy < Formula
   end
 
   def install
-    ENV.prepend_path "PATH", Formula["libcython"].opt_libexec/"bin"
-
     pythons.each do |python|
       python_exe = python.opt_libexec/"bin/python"
-      site_packages = Language::Python.site_packages(python_exe)
-      ENV.prepend_path "PYTHONPATH", Formula["libcython"].opt_libexec/site_packages
-
-      system python_exe, "-m", "pip", "install", *std_pip_args, "."
+      system python_exe, "-m", "pip", "install", *std_pip_args(build_isolation: true), "."
     end
   end
 
